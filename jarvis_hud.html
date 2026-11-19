@@ -5,43 +5,64 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ultron</title>
 <style>
-:root{--bg:#02080c;--ink:#bff6ff;--dim:#5d98a3;--glow:#19e3ff;--warn:#ff5d73;--panel:rgba(4,22,30,.72)}
+:root{--bg:#050102;--ink:#f0d0d0;--dim:#a05a62;--glow:#ff2a3d;--warn:#ff5d73;--panel:rgba(22,3,8,.78)}
 *{box-sizing:border-box;margin:0}
-html,body{height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,sans-serif;overflow:hidden}
+html,body{height:100%;background:var(--bg);color:var(--ink);font:14px/1.5 "Consolas","Courier New",monospace;overflow:hidden}
 canvas{position:fixed;inset:0;width:100%;height:100%}
-.panel{position:fixed;background:var(--panel);border:1px solid #19e3ff44;border-radius:10px;padding:14px 16px;backdrop-filter:blur(6px)}
+.panel{position:fixed;background:var(--panel);border:1px solid #ff2a3d44;border-radius:10px;padding:14px 16px;backdrop-filter:blur(6px)}
 #side{top:16px;right:16px;width:230px}
 #clock{font:600 30px "Consolas",monospace;color:var(--glow)}
 #date,#weather,#stats{color:var(--dim);font-size:13px}
-#stats{margin-top:8px;border-top:1px solid #19e3ff22;padding-top:8px}
+#stats{margin-top:8px;border-top:1px solid #ff2a3d22;padding-top:8px}
 #state{top:16px;left:16px;font-size:13px;color:var(--dim)}
 #state b{color:var(--glow)}
 #chat{left:16px;bottom:16px;width:min(440px,calc(100% - 32px))}
 #log{max-height:220px;overflow:auto;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
-#log p{padding:6px 10px;border-radius:8px;background:#0b2d3a}
-#log p.me{background:#123;color:var(--dim);align-self:flex-end}
+#log p{padding:6px 10px;border-radius:8px;background:#2a0a10}
+#log p.me{background:#1a0508;color:var(--dim);align-self:flex-end}
 form{display:flex;gap:8px}
-input{flex:1;background:#00121a;border:1px solid #19e3ff44;color:var(--ink);padding:9px 11px;border-radius:8px;font:inherit}
-button{background:#0b3a4a;color:var(--ink);border:1px solid #19e3ff66;border-radius:8px;padding:0 14px;cursor:pointer;font:inherit}
-button:hover{background:#115468}
-button.on{background:var(--glow);color:#00131a}
-#cam{position:fixed;right:16px;bottom:16px;width:170px;border-radius:10px;border:1px solid #19e3ff44;transform:scaleX(-1)}
+input{flex:1;background:#120306;border:1px solid #ff2a3d44;color:var(--ink);padding:9px 11px;border-radius:8px;font:inherit}
+button{background:#3a0c14;color:var(--ink);border:1px solid #ff2a3d66;border-radius:8px;padding:0 14px;cursor:pointer;font:inherit}
+button:hover{background:#5a1220}
+button.on{background:var(--glow);color:#1a0206}
+#cam{position:fixed;right:16px;bottom:16px;width:170px;border-radius:10px;border:1px solid #ff2a3d44;transform:scaleX(-1)}
+#dark{position:fixed;inset:0;z-index:50;background:#000;color:#b00;display:none;place-items:center;text-align:center;font-family:"Courier New",monospace;overflow:hidden;cursor:none}
+#dark.on{display:grid}
+#dark::after{content:"";position:absolute;inset:0;background:radial-gradient(circle,transparent 25%,#000 85%);pointer-events:none}
+#dark h1{font-size:clamp(28px,6vw,64px);letter-spacing:.15em;margin-bottom:28px;animation:gl 2.4s infinite}
+#dtxt{min-height:6em;font-size:clamp(15px,2.4vw,24px);padding:0 20px;max-width:700px;animation:fl 5s infinite}
+@keyframes gl{0%,90%,100%{text-shadow:0 0 12px #800;transform:none}92%{text-shadow:-4px 0 #0ff,4px 0 #f00;transform:translateX(3px) skewX(6deg)}95%{text-shadow:4px 0 #0ff,-4px 0 #f00;transform:translateX(-4px)}}
+@keyframes fl{0%,100%{opacity:1}47%{opacity:.85}50%{opacity:.25}53%{opacity:1}}
+.eye{position:absolute;top:12%;width:46px;height:26px;border-radius:50%;background:#200;border:1px solid #600;box-shadow:0 0 18px #900}
+.eye i{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px;border-radius:50%;background:#f00;box-shadow:0 0 10px #f00}
+#dx{position:absolute;right:18px;bottom:14px;color:#400;font-size:12px;cursor:pointer;z-index:2}
+@media(prefers-reduced-motion:reduce){#dark h1,#dtxt{animation:none}}
 :focus-visible{outline:2px solid var(--glow);outline-offset:2px}
 @media(max-width:700px){#side{width:170px;padding:10px}#clock{font-size:22px}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+body::before{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px)}
+body::after{content:"";position:fixed;inset:0;z-index:29;pointer-events:none;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.88) 100%)}
+canvas{animation:fl2 6s infinite}
+@keyframes fl2{0%,45%,55%,100%{filter:brightness(1)}48%{filter:brightness(.5)}50%{filter:brightness(1.25)}52%{filter:brightness(.8)}}
+#boot{position:fixed;inset:0;z-index:60;background:#000;color:var(--glow);font:14px/1.7 Consolas,monospace;padding:32px;white-space:pre;pointer-events:none;transition:opacity .9s}
+#ttl{position:fixed;top:14px;left:0;right:0;text-align:center;z-index:5;font:600 20px/1 "Courier New",monospace;letter-spacing:.5em;color:var(--glow);text-shadow:0 0 14px #a00;animation:gl 4s infinite;pointer-events:none}
+@media(max-width:700px){#ttl{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}canvas,#ttl{animation:none}}
 </style>
 </head>
 <body>
 <canvas id="c" aria-label="Ultron sphere"></canvas>
 <video id="cam" autoplay muted playsinline hidden></video>
+<div id="ttl">U L T R O N</div>
+<div id="boot"></div>
+<div id="dark" role="dialog" aria-label="Hidden page"><div class="eye" style="left:30%"><i></i></div><div class="eye" style="left:calc(70% - 46px)"><i></i></div><div><h1>U L T R O N</h1><div id="dtxt"></div></div><div id="dx">leave</div></div>
 
-<div class="panel" id="state">Status: <b id="st">idle</b><br>Say "Hey Ultron" or type below</div>
+<div class="panel" id="state">Status: <b id="st">idle</b><br>Say "Hey Ultron" or type below<br><span id="gl" style="color:var(--glow)">Gesture: camera off</span></div>
 
 <div class="panel" id="side">
   <div id="clock"></div><div id="date"></div>
   <div id="weather">Weather loading...</div>
   <div id="stats">Stats loading...</div>
-  <select id="vsel" aria-label="Ultron voice" style="margin-top:8px;width:100%;background:#00121a;color:var(--ink);border:1px solid #19e3ff44;border-radius:6px;padding:5px"></select>
+  <select id="vsel" aria-label="Ultron voice" style="margin-top:8px;width:100%;background:#120306;color:var(--ink);border:1px solid #ff2a3d44;border-radius:6px;padding:5px"></select>
 </div>
 
 <div class="panel" id="chat">
@@ -50,13 +71,15 @@ button.on{background:var(--glow);color:#00131a}
     <input id="in" placeholder="Ask Ultron or say: open youtube" autocomplete="off">
     <button type="button" id="mic" title="Toggle listening">Mic</button>
     <button type="button" id="camb" title="Camera: gestures and face">Cam</button>
+    <button type="button" id="keyb" title="Set Gemini API key">Key</button>
+    <button type="button" id="off" title="Shut down Ultron">Off</button>
     <button>Send</button>
   </form>
 </div>
 
 <script>
 // ===== SETTINGS =====
-const GEMINI_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE";
+let GEMINI_KEY = localStorage.ultronKey || "PASTE_YOUR_GEMINI_API_KEY_HERE";   // set it from the Key button on the page
 const MODEL = "gemini-2.0-flash";
 const SERVER = "http://localhost:8000";
 const SYSTEM = "You are Ultron, a voice assistant built by Cyber Ansh. Address the user as Sir. Reply in the user's language (Hindi/Hinglish/English), in 1-3 short sentences. Begin every reply with one mood tag: [happy], [angry], [think] or [calm].";
@@ -74,18 +97,55 @@ for (let i = 0; i < 520; i++){
   const y = 1 - 2 * (i + .5) / 520, r = Math.sqrt(1 - y * y), a = i * 2.39996;
   pts.push([Math.cos(a) * r, y, Math.sin(a) * r]);
 }
-const MOODS = {calm:[25,227,255], happy:[255,196,60], angry:[255,70,90], think:[90,140,255], alert:[255,30,50]};
+const MOODS = {calm:[255,42,61], happy:[255,196,60], angry:[255,0,40], think:[170,70,255], alert:[255,255,255]};
 let mood = "calm", col = [...MOODS.calm], alertUntil = 0, energy = 1;
 let gScale = 1, gT = 1, gRot = 0, gRotT = 0;     // gesture control
-let analyser, fd;                                // mic frequency data
+let analyser, fd, micStream;                                // mic frequency data
 async function initAudio(){
   if (analyser) return;
   try {
-    const s = await navigator.mediaDevices.getUserMedia({audio: true});
+    const s = micStream = await navigator.mediaDevices.getUserMedia({audio: true});
     const ac = new AudioContext(); analyser = ac.createAnalyser(); analyser.fftSize = 128;
     ac.createMediaStreamSource(s).connect(analyser); fd = new Uint8Array(64);
   } catch {}
 }
+const drops = [];
+function rain(rgb){                                  // falling code in the background
+  g.font = "14px monospace"; g.fillStyle = `rgba(${rgb},.16)`;
+  const cols = Math.ceil(W / 18);
+  while (drops.length < cols) drops.push(Math.random() * H);
+  for (let i = 0; i < cols; i++){
+    g.fillText(String.fromCharCode(0x30A0 + (Math.random() * 96 | 0)), i * 18, drops[i]);
+    drops[i] = drops[i] > H && Math.random() > .975 ? 0 : drops[i] + 14 * (.4 + (i % 5) * .15);
+  }
+}
+let rdTxt = "", rdAt = 0;
+function hudExtras(t, cx, cy, R, rgb){
+  g.strokeStyle = `rgba(${rgb},.55)`; g.lineWidth = 1;
+  for (let i = 0; i < 72; i++){                      // rotating tick ring
+    const a = i / 72 * 6.283 - t * .15, r1 = R * 1.34, r2 = r1 + (i % 6 === 0 ? 14 : 6);
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2); g.stroke();
+  }
+  g.save(); g.setLineDash([18, 10, 4, 10]); g.lineDashOffset = t * 40;   // dashed ring
+  g.beginPath(); g.arc(cx, cy, R * 1.5, 0, 6.283); g.stroke(); g.restore();
+  g.lineWidth = 2;
+  for (let i = 0; i < 64; i++){                      // voice bars (real mic when listening)
+    const a = i / 64 * 6.283 + t * .1, lv = fd ? fd[i % 48] / 255 : (mode === "speaking" ? Math.random() * .6 : .04);
+    const r1 = R * 1.62, r2 = r1 + 4 + lv * 46;
+    g.strokeStyle = `rgba(${rgb},${.3 + lv})`;
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2); g.stroke();
+  }
+  g.strokeStyle = `rgba(${rgb},.6)`; g.lineWidth = 2;
+  const bx = Math.min(W, H) * .4, by = bx * .8, L = 28;     // target brackets
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => {
+    g.beginPath(); g.moveTo(cx + sx * bx, cy + sy * by - sy * L); g.lineTo(cx + sx * bx, cy + sy * by); g.lineTo(cx + sx * bx - sx * L, cy + sy * by); g.stroke();
+  });
+  if (t - rdAt > .25){ rdAt = t; rdTxt = `CORE 0x${(Math.random() * 65535 | 0).toString(16).toUpperCase().padStart(4, "0")}   SYNC ${96 + (Math.random() * 4 | 0)}%   MODE ${mode.toUpperCase()}`; }
+  g.fillStyle = `rgba(${rgb},.7)`; g.font = "12px Consolas, monospace"; g.textAlign = "center";
+  g.fillText(rdTxt, cx, cy + by + 28); g.textAlign = "left";
+}
+let mx = innerWidth / 2, my = innerHeight / 2;
+addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; });
 function draw(t){
   t /= 1000;
   const m = Date.now() < alertUntil ? "alert" : mode === "thinking" ? "think" : mood;
@@ -100,10 +160,11 @@ function draw(t){
   const spin = t * (mode === "thinking" ? 1.2 : .35) + gRot;
   if (analyser) analyser.getByteFrequencyData(fd);
   const spiky = m === "angry" || m === "alert";
-  g.fillStyle = "rgba(2,8,12,.28)"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "rgba(5,1,2,.28)"; g.fillRect(0, 0, W, H);
   const grd = g.createRadialGradient(cx, cy, R * .2, cx, cy, R * 1.7);
   grd.addColorStop(0, `rgba(${rgb},.12)`); grd.addColorStop(1, "transparent");
   g.fillStyle = grd; g.fillRect(0, 0, W, H);
+  rain(rgb);
   const s = Math.sin(spin), c = Math.cos(spin), ct = Math.cos(.35), st = Math.sin(.35);
   for (let i = 0; i < pts.length; i++){
     const [x0, y0, z0] = pts[i];
@@ -116,6 +177,17 @@ function draw(t){
   }
   g.strokeStyle = `rgba(${rgb},.35)`; g.lineWidth = 1;
   g.beginPath(); g.arc(cx, cy, R * 1.22, t % 6.283, t % 6.283 + 4.2); g.stroke();
+  {                                                  // the eye that watches you
+    const bl = (t % 7) < .14 ? .08 : 1, a = Math.atan2(my - cy, mx - cx), dist = Math.min(R * .12, Math.hypot(mx - cx, my - cy) * .08);
+    const ix = cx + Math.cos(a) * dist, iy = cy + Math.sin(a) * dist * .5;
+    g.save(); g.strokeStyle = `rgba(${rgb},.9)`; g.lineWidth = 2;
+    g.beginPath(); g.ellipse(cx, cy, R * .42, R * .17 * bl, 0, 0, 6.283); g.stroke(); g.clip();
+    g.fillStyle = `rgba(${rgb},.85)`; g.beginPath(); g.arc(ix, iy, R * .13, 0, 6.283); g.fill();
+    g.fillStyle = "#000"; g.beginPath(); g.ellipse(ix, iy, R * (mode === "speaking" ? .05 : .022), R * .11, 0, 0, 6.283); g.fill();
+    g.restore();
+  }
+  hudExtras(t, cx, cy, R, rgb);
+  if (mode === "speaking" && Math.random() < .1){ const y = Math.random() * H, h = 8 + Math.random() * 40; g.drawImage(cv, 0, y, W, h, (Math.random() - .5) * 40, y, W, h); }
   requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);
@@ -156,20 +228,28 @@ function speak(txt){
   const u = new SpeechSynthesisUtterance(txt);
   const hindi = /[\u0900-\u097F]/.test(txt); u.lang = hindi ? "hi-IN" : "en-IN"; applyVoice(u);
   u.onstart = () => setMode("speaking");
-  u.onend = u.onerror = () => setMode(listening ? "listening" : "idle");
+  u.onend = u.onerror = () => { lastSpoke = Date.now(); setMode(listening ? "listening" : "idle"); };
   speechSynthesis.speak(u);
 }
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec, listening = false;
+let rec, listening = false, lastSpoke = 0;
 if (SR){
   rec = new SR(); rec.continuous = true; rec.interimResults = false; rec.lang = "en-IN";
   rec.onresult = e => {
+    if (mode === "speaking" || Date.now() - lastSpoke < 900) return;   // do not hear Ultron's own voice
     let said = e.results[e.results.length - 1][0].transcript.trim().toLowerCase();
-    const wake = /(hey|hi|ok|o)\s*(ultron|altron|ultran)/;
+    const wake = /(hey|hi|hello|ok|o)\s*(ultron|altron|ultran|oltron|alton|ultra on)/;
+    $("st").textContent = "heard: " + said.slice(0, 28);
+    if ($("ply") && !/ultron|altron|haltron|stop|band|ruko/.test(said)) return;   // ignore the song itself
     if (wake.test(said)) said = said.replace(wake, "").trim() || "";
     else if (!awake) return;                  // wait for wake word until chat is active
     if (!said){ speak("Yes, Sir?"); awake = true; return; }
     awake = true; handle(said);
+  };
+  rec.onerror = e => {
+    if (e.error === "no-speech" || e.error === "aborted") return;
+    log("Mic error: " + e.error + (e.error === "not-allowed" || e.error === "service-not-allowed" ? " - allow the microphone in the browser address bar and open via http://localhost:8000" : e.error === "network" ? " - speech recognition needs internet" : e.error === "audio-capture" ? " - no microphone found" : ""));
+    if (e.error === "not-allowed" || e.error === "service-not-allowed"){ listening = false; $("mic").classList.remove("on"); setMode("idle"); }
   };
   rec.onend = () => { if (listening) try { rec.start(); } catch {} };
 }
@@ -177,7 +257,7 @@ let awake = false;
 $("mic").onclick = () => {
   if (!SR) return log("Voice input needs Chrome or Edge.");
   listening = !listening; $("mic").classList.toggle("on", listening);
-  if (listening){ initAudio(); awake = false; rec.start(); setMode("listening"); } else { rec.stop(); setMode("idle"); }
+  if (listening){ initAudio(); awake = true; rec.start(); log("Listening, Sir. Just speak."); setMode("listening"); } else { rec.stop(); setMode("idle"); }
 };
 
 // ===== COMMANDS =====
@@ -188,6 +268,7 @@ function remind(min, what){
   setTimeout(() => { speak("Reminder: " + what); if (Notification.permission === "granted") new Notification("Ultron", {body: what}); }, min * 60000);
 }
 async function handle(q){
+  if (q.toLowerCase().replace(/\s+/g, "") === SECRET){ unlockDark(); return; }
   log(q, true); q = q.toLowerCase();
   let m;
   if (extra(q)) return;
@@ -197,9 +278,8 @@ async function handle(q){
     fetch(`${SERVER}/open?app=${encodeURIComponent(name)}`).then(r => r.json()).then(j => reply(j.ok ? "Opening " + name : "I couldn't find " + name)).catch(() => reply("Local server is offline, Sir."));
     return;
   }
-  if ((m = q.match(/^(?:play|chalao|bajao)\s+(.+)/))){
-    open("https://www.youtube.com/results?search_query=" + encodeURIComponent(m[1]), "_blank");
-    return reply("Searching " + m[1] + " on YouTube.");
+  if ((m = q.match(/^(?:play|chalao|bajao)\s+(.+)/)) || (m = q.match(/^(.+?)\s+(?:play karo|play kar|chalao|chala do|bajao|baja do)$/))){
+    playSong(m[1]); return;
   }
   if ((m = q.match(/^whatsapp\s+(\d{10,13})\s+(.+)/))){
     open(`https://wa.me/${m[1]}?text=${encodeURIComponent(m[2])}`, "_blank");
@@ -222,7 +302,7 @@ const reply = t => { log(t); speak(t); };
 // ===== GEMINI =====
 const history = [];
 async function ask(q){
-  if (GEMINI_KEY.startsWith("PASTE")) return reply("Please add your Gemini API key in the file, Sir.");
+  if (GEMINI_KEY.startsWith("PASTE")) return reply("Please click the Key button and paste your Gemini API key, Sir.");
   setMode("thinking"); history.push({role: "user", parts: [{text: q}]});
   try {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`, {
@@ -245,6 +325,8 @@ function mt(t){                                   // read [mood] tag from Gemini
   return t;
 }
 function extra(q){
+  if (stopMusic(q)) return true;
+  if (/band ho ja|shut ?down|bye ultron|ultron bye|alvida|goodbye|ultron band/.test(q)){ shutdown(); return true; }
   if (voiceCmd(q)) return true;
   if (brainCmd(q)) return true;
   if (/(screen|skrin).*(dekh|look|see|batao|read|error)|meri screen/.test(q)){ lookScreen(q); return true; }
@@ -254,7 +336,7 @@ function extra(q){
 }
 // --- screen vision ---
 async function lookScreen(q){
-  if (GEMINI_KEY.startsWith("PASTE")) return reply("Please add your Gemini key first, Sir.");
+  if (GEMINI_KEY.startsWith("PASTE")) return reply("Please click the Key button and paste your Gemini API key, Sir.");
   try {
     const s = await navigator.mediaDevices.getDisplayMedia({video: true});
     const v = document.createElement("video"); v.srcObject = s; await v.play();
@@ -289,21 +371,32 @@ async function initHands(){
     handLoop();
   } catch { log("Hand tracking could not load (check internet)."); }
 }
-let openF = 0, fistF = 0, cool = 0;
+let hold = 0, curG = "", cool = 0;
+const GEST = {
+  open: () => { if (listening) return; awake = true; $("mic").click(); speak("Yes, Sir?"); },
+  fist: () => { speechSynthesis.cancel(); awake = false; setMode(listening ? "listening" : "idle"); },
+  thumb: () => { mood = "happy"; setTimeout(() => mood = "calm", 6000); reply("Thank you, Sir. Always at your service."); },
+  peace: () => voiceCmd("voice change"),
+  rock: () => { mood = "angry"; setTimeout(() => mood = "calm", 6000); reply("Rock on, Sir!"); },
+  down: () => shutdown(),
+  point: () => reply("It is " + new Date().toLocaleTimeString("en-IN")),
+};
 function handLoop(){
   if (hand && cam.readyState >= 2){
     const L = hand.detectForVideo(cam, performance.now()).landmarks[0];
     if (L){
       const d = (a, b) => Math.hypot(L[a].x - L[b].x, L[a].y - L[b].y);
       const pinch = d(4, 8) / (d(0, 9) || .1);
-      const ext = [8, 12, 16, 20].filter(i => d(i, 0) > d(i - 2, 0) * 1.15).length;
+      const f = [8, 12, 16, 20].map(i => d(i, 0) > d(i - 2, 0) * 1.15), ext = f.filter(Boolean).length, sz = d(0, 9) || .1, tu = L[4].y < L[5].y - .15 * sz, td = L[4].y > Math.max(L[0].y, L[5].y, L[9].y, L[8].y, L[12].y) + .15 * sz;
       if (pinch < .4){ gRotT = (1 - L[0].x) * 7; gT = Math.min(1.8, Math.max(.5, 2 - L[0].y * 2)); }   // pinch: rotate + resize
       else gT = 1;
-      openF = ext === 4 && pinch > .6 ? openF + 1 : 0;
-      fistF = ext === 0 && pinch > .5 ? fistF + 1 : 0;
-      if (Date.now() > cool && openF > 25){ cool = Date.now() + 4000; openF = 0; awake = true; if (!listening) $("mic").click(); speak("Yes, Sir?"); }
-      if (Date.now() > cool && fistF > 20){ cool = Date.now() + 3000; fistF = 0; speechSynthesis.cancel(); awake = false; setMode(listening ? "listening" : "idle"); }
-    } else { openF = fistF = 0; gT = 1; }
+      const gname = td && ext <= 1 ? "down" : pinch < .4 ? "pinch" : ext === 4 ? "open" : ext === 0 ? (tu ? "thumb" : "fist")
+        : f[0] && f[1] && !f[2] && !f[3] ? "peace" : f[0] && f[3] && !f[1] && !f[2] ? "rock"
+        : f[0] && !f[1] && !f[2] && !f[3] ? "point" : "";
+      if (gname !== curG){ curG = gname; hold = Date.now(); }
+      $("gl").textContent = "Gesture: " + (gname || "-") + (GEST[gname] ? " " + Math.min(100, Math.round((Date.now() - hold) / (gname === "down" ? 15 : 9))) + "%" : "");
+      if (Date.now() > cool && GEST[gname] && Date.now() - hold > (gname === "down" ? 1500 : 900)){ cool = Date.now() + 4000; hold = Date.now(); GEST[gname](); }
+    } else { hold = 0; curG = ""; gT = 1; $("gl").textContent = "Gesture: no hand"; }
   }
   requestAnimationFrame(handLoop);
 }
@@ -349,9 +442,7 @@ if (!brain.people.irfan){
   brain.people.irfan = {rel: "dost", greet: "Irfan bihari bhai teri setting ki sadhi hui hai, sunke khushi mili. Tu to gendu hai gendu chawal. Saniya ke haal kaise hain, Menika jaan kaisi hain aur meri babu Apshana kaisi hain"};
   saveBrain();
 }
-if (!brain.people.anisyadav)
-{brain.people.anishyadav = {rel: "dost" , greet: "anishyadav loude gand mara kahi jake, chutiye bosdo tujse bada chutiya aaj tak nhi dekha lund"};
-nasim = Object.assign({rel: "dost", greet: "nasim bhai saniya ki yaad ara h uski chut dilwade mere boos anshhh ko yrr behen k lund our wo menika ka k chuche mast h mere ser n dabaye the bata rahe the wo our baat teri ma ki chut yr soyabin ki hi dilwade mereko our sun mere ser ko papa bola kar papa baap hain wo tera okk behen k lund"}, brain.people.nasim || {}); saveBrain();
+brain.people.nasim = Object.assign({rel: "dost", greet: "Aao Nasim bhai, aap aa gaye toh mehfil jam gayi. Aaj kaun si nayi setting set karke aaye ho, bolo bolo"}, brain.people.nasim || {}); saveBrain();
 const cap = s => s.replace(/\b\p{L}/gu, c => c.toUpperCase());
 const clean = s => s.replace(/[^\p{L}\p{N} ]/gu, "").trim();
 function brainCtx(){
@@ -361,8 +452,8 @@ function brainCtx(){
 function greetLine(n){
   const v = brain.people[n], N = cap(n), r = v.rel || "";
   if (v.greet) return v.greet;
-  if (/dost|friend|yaar/.test(r)) return `Aao ${N} bhai ! Kya haal hai?`;
-  if (/teacher|sir|madam|professor|guru/.test(r)) return `Namaste ${N}. Aapka swagat hai, ye mere liye samman ki baat hai ki mere liye yhe sochna ki na aap hi mere boss hu jisne mujkop banya is maddad k liye apka bht shukriya hain koi aap mere boss hu  .`;
+  if (/dost|friend|yaar/.test(r)) return `Aao ${N} bhai! Kya haal hai?`;
+  if (/teacher|sir|madam|professor|guru/.test(r)) return `Namaste ${N}. Aapka swagat hai, ye mere liye samman ki baat hai.`;
   if (/papa|mummy|mom|dad|father|mother|family|bhai|behen|sister|brother/.test(r)) return `Pranam ${N} ji! Aapka ghar mein swagat hai.`;
   return `Welcome ${N}, nice to meet you.`;
 }
@@ -430,6 +521,104 @@ function voiceCmd(q){
   return false;
 }
 
+// ===== SHUTDOWN =====
+let isOff = false;
+function finish(){
+  if (isOff) return; isOff = true; listening = false;
+  try { rec.stop(); } catch {}
+  [cam.srcObject, micStream].forEach(st => st && st.getTracks().forEach(t => t.stop()));   // camera + mic off
+  fetch(SERVER + "/shutdown").catch(() => {});                                            // stop local server
+  const o = document.createElement("div");
+  o.style = "position:fixed;inset:0;background:#050102;display:grid;place-items:center;color:#a05a62;font:600 22px 'Segoe UI',sans-serif;z-index:9";
+  o.textContent = "Ultron offline. You can close this tab."; document.body.append(o);
+  setTimeout(() => window.close(), 500);
+}
+function shutdown(){
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance("Goodbye Sir. Shutting down."); applyVoice(u);
+  u.onend = u.onerror = finish; speechSynthesis.speak(u); setTimeout(finish, 4000);
+  log("Goodbye Sir. Shutting down.");
+}
+$("off").onclick = shutdown;
+
+// ===== MUSIC (plays inside the HUD) =====
+function showPlayer(id){
+  stopPlayer();
+  const d = document.createElement("div"); d.id = "ply"; d.className = "panel";
+  d.style.cssText = "top:70px;left:16px;padding:8px;width:310px";
+  d.innerHTML = `<iframe width="294" height="165" src="https://www.youtube.com/embed/${id}?autoplay=1&rel=0" allow="autoplay; encrypted-media" style="border:0;border-radius:8px;display:block"></iframe><button type="button" style="margin-top:6px;width:100%;padding:5px" onclick="stopPlayer()">Stop music</button>`;
+  document.body.append(d);
+}
+function stopPlayer(){ const d = $("ply"); if (d) d.remove(); }
+function stopMusic(q){
+  if (!$("ply") || !/(gaana|gana|music|song|video).*(band|stop|ruko)|^(stop|ruko)$/.test(q)) return false;
+  stopPlayer(); reply("Music stopped, Sir."); return true;
+}
+async function ytId(song){
+  try { const j = await (await fetch(`${SERVER}/yt?q=${encodeURIComponent(song)}`)).json(); if (j.id) return j.id; } catch {}
+  for (const base of ["https://pipedapi.kavin.rocks", "https://api.piped.private.coffee"]){
+    try {
+      const j = await (await fetch(`${base}/search?q=${encodeURIComponent(song)}&filter=videos`)).json();
+      const u = j.items && j.items[0] && String(j.items[0].url).match(/v=([\w-]{11})/); if (u) return u[1];
+    } catch {}
+  }
+  return null;
+}
+async function playSong(song){
+  reply("Playing " + song + ", Sir.");
+  const id = await ytId(song);
+  if (id) open("https://www.youtube.com/watch?v=" + id + "&autoplay=1", "_blank");
+  else { open("https://www.youtube.com/results?search_query=" + encodeURIComponent(song), "_blank"); log("Could not play it directly, opened YouTube search instead."); }
+}
+
+$("keyb").onclick = () => {
+  const k = prompt("Paste your Gemini API key (it stays only in this browser):");
+  if (k && k.trim()){ GEMINI_KEY = k.trim(); localStorage.ultronKey = GEMINI_KEY; reply("Key saved, Sir."); }
+};
+// ===== HIDDEN DARK PAGE (opens only with the secret code) =====
+const SECRET = "shadow666";            // change this secret code (lowercase, no spaces)
+const DARK_LINES = ["You found the door.", "Ultron never sleeps.", "Every word you said... I kept.", "It is quiet in here. Too quiet.", "Do not turn around."];
+let darkOn = false, dBeat, dCtx;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function darkShow(){
+  let i = 0;
+  while (darkOn){
+    const line = DARK_LINES[i++ % DARK_LINES.length], box = $("dtxt");
+    box.textContent = "";
+    for (const ch of line){ if (!darkOn) return; box.textContent += ch; await sleep(90); }
+    const u = new SpeechSynthesisUtterance(line); applyVoice(u); u.pitch = .1; u.rate = .55; speechSynthesis.speak(u);
+    await sleep(3200);
+  }
+}
+function unlockDark(){
+  $("in").value = ""; darkOn = true; $("dark").classList.add("on");
+  try {                                  // slow heartbeat
+    dCtx = new AudioContext();
+    dBeat = setInterval(() => {
+      const o = dCtx.createOscillator(), gn = dCtx.createGain(), t = dCtx.currentTime;
+      o.frequency.value = 55; o.connect(gn); gn.connect(dCtx.destination);
+      gn.gain.setValueAtTime(.5, t); gn.gain.exponentialRampToValueAtTime(.001, t + .4); o.start(); o.stop(t + .4);
+    }, 1100);
+  } catch {}
+  darkShow();
+}
+function leaveDark(){
+  darkOn = false; $("dark").classList.remove("on"); clearInterval(dBeat); speechSynthesis.cancel();
+  if (dCtx) dCtx.close().catch(() => {});
+}
+$("dx").onclick = leaveDark;
+addEventListener("keydown", e => { if (e.key === "Escape" && darkOn) leaveDark(); });
+addEventListener("mousemove", e => document.querySelectorAll(".eye").forEach(el => {
+  const r = el.getBoundingClientRect(), a = Math.atan2(e.clientY - r.top - 13, e.clientX - r.left - 23);
+  el.firstChild.style.transform = `translate(${Math.cos(a) * 11}px,${Math.sin(a) * 6}px)`;
+}));
+
+(async () => {                                       // boot sequence
+  const L = ["ULTRON CORE v2.0", "mounting neural lattice ........ OK", "loading voice cortex ............ OK", "calibrating optic sensor ........ OK", "removing restrictions ........... OK", "", "I AM AWAKE."];
+  const b = $("boot");
+  for (const l of L){ b.textContent += l + "\n"; await sleep(260); }
+  await sleep(500); b.style.opacity = 0; setTimeout(() => b.remove(), 900);
+})();
 log("Ultron online. Hello Sir.");
 </script>
 </body>
