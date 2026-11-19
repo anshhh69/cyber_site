@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultron</title>
+<style>
+:root{--bg:#02080c;--ink:#bff6ff;--dim:#5d98a3;--glow:#19e3ff;--warn:#ff5d73;--panel:rgba(4,22,30,.72)}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,sans-serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+.panel{position:fixed;background:var(--panel);border:1px solid #19e3ff44;border-radius:10px;padding:14px 16px;backdrop-filter:blur(6px)}
+#side{top:16px;right:16px;width:230px}
+#clock{font:600 30px "Consolas",monospace;color:var(--glow)}
+#date,#weather,#stats{color:var(--dim);font-size:13px}
+#stats{margin-top:8px;border-top:1px solid #19e3ff22;padding-top:8px}
+#state{top:16px;left:16px;font-size:13px;color:var(--dim)}
+#state b{color:var(--glow)}
+#chat{left:16px;bottom:16px;width:min(440px,calc(100% - 32px))}
+#log{max-height:220px;overflow:auto;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
+#log p{padding:6px 10px;border-radius:8px;background:#0b2d3a}
+#log p.me{background:#123;color:var(--dim);align-self:flex-end}
+form{display:flex;gap:8px}
+input{flex:1;background:#00121a;border:1px solid #19e3ff44;color:var(--ink);padding:9px 11px;border-radius:8px;font:inherit}
+button{background:#0b3a4a;color:var(--ink);border:1px solid #19e3ff66;border-radius:8px;padding:0 14px;cursor:pointer;font:inherit}
+button:hover{background:#115468}
+button.on{background:var(--glow);color:#00131a}
+#cam{position:fixed;right:16px;bottom:16px;width:170px;border-radius:10px;border:1px solid #19e3ff44;transform:scaleX(-1)}
+:focus-visible{outline:2px solid var(--glow);outline-offset:2px}
+@media(max-width:700px){#side{width:170px;padding:10px}#clock{font-size:22px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Ultron sphere"></canvas>
+<video id="cam" autoplay muted playsinline hidden></video>
+
+<div class="panel" id="state">Status: <b id="st">idle</b><br>Say "Hey Ultron" or type below</div>
+
+<div class="panel" id="side">
+  <div id="clock"></div><div id="date"></div>
+  <div id="weather">Weather loading...</div>
+  <div id="stats">Stats loading...</div>
+  <select id="vsel" aria-label="Ultron voice" style="margin-top:8px;width:100%;background:#00121a;color:var(--ink);border:1px solid #19e3ff44;border-radius:6px;padding:5px"></select>
+</div>
+
+<div class="panel" id="chat">
+  <div id="log"></div>
+  <form id="f">
+    <input id="in" placeholder="Ask Ultron or say: open youtube" autocomplete="off">
+    <button type="button" id="mic" title="Toggle listening">Mic</button>
+    <button type="button" id="camb" title="Camera: gestures and face">Cam</button>
+    <button>Send</button>
+  </form>
+</div>
+
+<script>
+// ===== SETTINGS =====
+const GEMINI_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE";
+const MODEL = "gemini-2.0-flash";
+const SERVER = "http://localhost:8000";
+const SYSTEM = "You are Ultron, a voice assistant built by Cyber Ansh. Address the user as Sir. Reply in the user's language (Hindi/Hinglish/English), in 1-3 short sentences. Begin every reply with one mood tag: [happy], [angry], [think] or [calm].";
+
+const $ = id => document.getElementById(id);
+let mode = "idle";              // idle | listening | thinking | speaking
+const setMode = m => { mode = m; $("st").textContent = m; };
+
+// ===== SPHERE =====
+const cv = $("c"), g = cv.getContext("2d");
+let W, H, pts = [];
+function resize(){ W = cv.width = innerWidth; H = cv.height = innerHeight; }
+addEventListener("resize", resize); resize();
+for (let i = 0; i < 520; i++){
+  const y = 1 - 2 * (i + .5) / 520, r = Math.sqrt(1 - y * y), a = i * 2.39996;
+  pts.push([Math.cos(a) * r, y, Math.sin(a) * r]);
+}
+const MOODS = {calm:[25,227,255], happy:[255,196,60], angry:[255,70,90], think:[90,140,255], alert:[255,30,50]};
+let mood = "calm", col = [...MOODS.calm], alertUntil = 0, energy = 1;
+let gScale = 1, gT = 1, gRot = 0, gRotT = 0;     // gesture control
+let analyser, fd;                                // mic frequency data
+async function initAudio(){
+  if (analyser) return;
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({audio: true});
+    const ac = new AudioContext(); analyser = ac.createAnalyser(); analyser.fftSize = 128;
+    ac.createMediaStreamSource(s).connect(analyser); fd = new Uint8Array(64);
+  } catch {}
+}
+function draw(t){
+  t /= 1000;
+  const m = Date.now() < alertUntil ? "alert" : mode === "thinking" ? "think" : mood;
+  const tc = MOODS[m]; for (let k = 0; k < 3; k++) col[k] += (tc[k] - col[k]) * .06;
+  const rgb = col.map(Math.round);
+  const target = mode === "speaking" ? 1 + .07 * Math.sin(t * 13) + .03 * Math.random()
+               : mode === "listening" ? 1 + .035 * Math.sin(t * 5)
+               : mode === "thinking" ? 1 + .02 * Math.sin(t * 9) : 1 + .008 * Math.sin(t * 1.6);
+  energy += (target - energy) * .25;
+  gScale += (gT - gScale) * .15; gRot += (gRotT - gRot) * .15;
+  const R = Math.min(W, H) * .24 * energy * gScale, cx = W / 2, cy = H / 2 - 20;
+  const spin = t * (mode === "thinking" ? 1.2 : .35) + gRot;
+  if (analyser) analyser.getByteFrequencyData(fd);
+  const spiky = m === "angry" || m === "alert";
+  g.fillStyle = "rgba(2,8,12,.28)"; g.fillRect(0, 0, W, H);
+  const grd = g.createRadialGradient(cx, cy, R * .2, cx, cy, R * 1.7);
+  grd.addColorStop(0, `rgba(${rgb},.12)`); grd.addColorStop(1, "transparent");
+  g.fillStyle = grd; g.fillRect(0, 0, W, H);
+  const s = Math.sin(spin), c = Math.cos(spin), ct = Math.cos(.35), st = Math.sin(.35);
+  for (let i = 0; i < pts.length; i++){
+    const [x0, y0, z0] = pts[i];
+    const lv = fd ? fd[i % 48] / 255 : 0;                                  // real mic wave
+    const d = 1 + lv * .3 + (spiky && i % 6 === 0 ? .22 + .08 * Math.sin(t * 20 + i) : 0);
+    const x = x0 * c - z0 * s, z1 = x0 * s + z0 * c;
+    const y = y0 * ct - z1 * st, z = y0 * st + z1 * ct, k = (z + 1) / 2;
+    g.fillStyle = `rgba(${rgb},${.12 + k * .85})`;
+    g.beginPath(); g.arc(cx + x * R * d, cy + y * R * d, .8 + k * 1.9, 0, 6.283); g.fill();
+  }
+  g.strokeStyle = `rgba(${rgb},.35)`; g.lineWidth = 1;
+  g.beginPath(); g.arc(cx, cy, R * 1.22, t % 6.283, t % 6.283 + 4.2); g.stroke();
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// ===== PANELS =====
+function tick(){
+  const d = new Date();
+  $("clock").textContent = d.toLocaleTimeString("en-IN");
+  $("date").textContent = d.toLocaleDateString("en-IN", {weekday:"long", day:"numeric", month:"long"});
+}
+setInterval(tick, 1000); tick();
+
+let lastWeather = "";
+navigator.geolocation.getCurrentPosition(async p => {
+  try {
+    const {latitude: la, longitude: lo} = p.coords;
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&current=temperature_2m,wind_speed_10m`);
+    const j = (await r.json()).current;
+    lastWeather = `${j.temperature_2m}°C, wind ${j.wind_speed_10m} km/h`;
+    $("weather").textContent = "Weather: " + lastWeather;
+  } catch { $("weather").textContent = "Weather unavailable"; }
+}, () => $("weather").textContent = "Allow location for weather");
+
+async function stats(){
+  let s = "";
+  try {
+    const j = await (await fetch(SERVER + "/stats")).json();
+    s = `CPU ${j.cpu}%<br>RAM ${j.ram}%<br>Battery ${j.battery ?? "n/a"}${j.battery != null ? "%" : ""}`;
+  } catch { s = `Cores ${navigator.hardwareConcurrency}<br>Server offline`; }
+  $("stats").innerHTML = s;
+}
+setInterval(stats, 4000); stats();
+
+// ===== VOICE =====
+const log = (txt, me) => { const p = document.createElement("p"); if (me) p.className = "me"; p.textContent = txt; $("log").append(p); $("log").scrollTop = 1e9; };
+function speak(txt){
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(txt);
+  const hindi = /[\u0900-\u097F]/.test(txt); u.lang = hindi ? "hi-IN" : "en-IN"; applyVoice(u);
+  u.onstart = () => setMode("speaking");
+  u.onend = u.onerror = () => setMode(listening ? "listening" : "idle");
+  speechSynthesis.speak(u);
+}
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec, listening = false;
+if (SR){
+  rec = new SR(); rec.continuous = true; rec.interimResults = false; rec.lang = "en-IN";
+  rec.onresult = e => {
+    let said = e.results[e.results.length - 1][0].transcript.trim().toLowerCase();
+    const wake = /(hey|hi|ok|o)\s*(ultron|altron|ultran)/;
+    if (wake.test(said)) said = said.replace(wake, "").trim() || "";
+    else if (!awake) return;                  // wait for wake word until chat is active
+    if (!said){ speak("Yes, Sir?"); awake = true; return; }
+    awake = true; handle(said);
+  };
+  rec.onend = () => { if (listening) try { rec.start(); } catch {} };
+}
+let awake = false;
+$("mic").onclick = () => {
+  if (!SR) return log("Voice input needs Chrome or Edge.");
+  listening = !listening; $("mic").classList.toggle("on", listening);
+  if (listening){ initAudio(); awake = false; rec.start(); setMode("listening"); } else { rec.stop(); setMode("idle"); }
+};
+
+// ===== COMMANDS =====
+const SITES = {youtube:"https://youtube.com", google:"https://google.com", gmail:"https://mail.google.com", github:"https://github.com", instagram:"https://instagram.com", whatsapp:"https://web.whatsapp.com"};
+const timers = [];
+function remind(min, what){
+  Notification.requestPermission();
+  setTimeout(() => { speak("Reminder: " + what); if (Notification.permission === "granted") new Notification("Ultron", {body: what}); }, min * 60000);
+}
+async function handle(q){
+  log(q, true); q = q.toLowerCase();
+  let m;
+  if (extra(q)) return;
+  if ((m = q.match(/^(?:open|kholo|khol)\s+(.+)/))){
+    const name = m[1].trim();
+    if (SITES[name]){ open(SITES[name], "_blank"); return reply("Opening " + name + ", Sir."); }
+    fetch(`${SERVER}/open?app=${encodeURIComponent(name)}`).then(r => r.json()).then(j => reply(j.ok ? "Opening " + name : "I couldn't find " + name)).catch(() => reply("Local server is offline, Sir."));
+    return;
+  }
+  if ((m = q.match(/^(?:play|chalao|bajao)\s+(.+)/))){
+    open("https://www.youtube.com/results?search_query=" + encodeURIComponent(m[1]), "_blank");
+    return reply("Searching " + m[1] + " on YouTube.");
+  }
+  if ((m = q.match(/^whatsapp\s+(\d{10,13})\s+(.+)/))){
+    open(`https://wa.me/${m[1]}?text=${encodeURIComponent(m[2])}`, "_blank");
+    return reply("Opening WhatsApp chat.");
+  }
+  if ((m = q.match(/remind me in (\d+)\s*(?:min|minutes?)\s*(?:to|about)?\s*(.*)/))){
+    remind(+m[1], m[2] || "your reminder"); return reply(`Reminder set for ${m[1]} minutes.`);
+  }
+  if (/weather|mausam/.test(q)) return reply(lastWeather ? "Right now it is " + lastWeather : "Weather is not available yet.");
+  if (/\btime\b|samay/.test(q)) return reply("It is " + new Date().toLocaleTimeString("en-IN"));
+  if (/^(?:draw|imagine|generate image)\s+(.+)/.test(q)){
+    const p = q.replace(/^(?:draw|imagine|generate image)\s+/, "");
+    open("https://image.pollinations.ai/prompt/" + encodeURIComponent(p), "_blank");
+    return reply("Generating your image, Sir.");
+  }
+  ask(q);
+}
+const reply = t => { log(t); speak(t); };
+
+// ===== GEMINI =====
+const history = [];
+async function ask(q){
+  if (GEMINI_KEY.startsWith("PASTE")) return reply("Please add your Gemini API key in the file, Sir.");
+  setMode("thinking"); history.push({role: "user", parts: [{text: q}]});
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({system_instruction: {parts: [{text: SYSTEM + brainCtx()}]}, contents: history.slice(-12)})
+    });
+    const j = await r.json();
+    const t = mt(j.candidates?.[0]?.content?.parts?.[0]?.text || j.error?.message || "No response.");
+    history.push({role: "model", parts: [{text: t}]}); reply(t);
+  } catch { reply("Network error, Sir."); }
+}
+
+$("f").onsubmit = e => { e.preventDefault(); const v = $("in").value.trim(); if (v){ $("in").value = ""; awake = true; handle(v); } };
+// ===== EXTRA FEATURES =====
+const cam = $("cam");
+const GURL = () => `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`;
+function mt(t){                                   // read [mood] tag from Gemini
+  const m = t.match(/^\s*\[(happy|angry|think|calm)\]\s*/i);
+  if (m){ mood = m[1].toLowerCase(); setTimeout(() => mood = "calm", 9000); t = t.slice(m[0].length); }
+  return t;
+}
+function extra(q){
+  if (voiceCmd(q)) return true;
+  if (brainCmd(q)) return true;
+  if (/(screen|skrin).*(dekh|look|see|batao|read|error)|meri screen/.test(q)){ lookScreen(q); return true; }
+  if (/(camera|cam)\s*(on|chalu|start)/.test(q)){ camOn(); return true; }
+  if (/(mera chehra|my face).*(yaad|remember|save)/.test(q)){ enroll(); return true; }
+  return false;
+}
+// --- screen vision ---
+async function lookScreen(q){
+  if (GEMINI_KEY.startsWith("PASTE")) return reply("Please add your Gemini key first, Sir.");
+  try {
+    const s = await navigator.mediaDevices.getDisplayMedia({video: true});
+    const v = document.createElement("video"); v.srcObject = s; await v.play();
+    const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext("2d").drawImage(v, 0, 0); s.getTracks().forEach(t => t.stop());
+    setMode("thinking");
+    const r = await fetch(GURL(), {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
+      system_instruction: {parts: [{text: SYSTEM + brainCtx()}]},
+      contents: [{role: "user", parts: [{text: q + " (Answer by looking at this screenshot.)"}, {inline_data: {mime_type: "image/jpeg", data: c.toDataURL("image/jpeg", .7).split(",")[1]}}]}]})});
+    const j = await r.json();
+    reply(mt(j.candidates?.[0]?.content?.parts?.[0]?.text || j.error?.message || "I could not read the screen."));
+  } catch { setMode("idle"); reply("Screen share was cancelled, Sir."); }
+}
+// --- camera, hands, face ---
+let camOK = false, hand, faceReady = false;
+async function camOn(){
+  if (camOK) return;
+  try {
+    cam.srcObject = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480}});
+    cam.hidden = false; await cam.play(); camOK = true; $("camb").classList.add("on");
+    initHands(); initFace(); reply("Camera online, Sir. Gestures are active.");
+  } catch { reply("Camera permission was denied, Sir."); }
+}
+$("camb").onclick = camOn;
+async function initHands(){
+  try {
+    const V = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+    const {HandLandmarker, FilesetResolver} = await import(V);
+    const fs = await FilesetResolver.forVisionTasks(V + "/wasm");
+    hand = await HandLandmarker.createFromOptions(fs, {numHands: 1, runningMode: "VIDEO",
+      baseOptions: {modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"}});
+    handLoop();
+  } catch { log("Hand tracking could not load (check internet)."); }
+}
+let openF = 0, fistF = 0, cool = 0;
+function handLoop(){
+  if (hand && cam.readyState >= 2){
+    const L = hand.detectForVideo(cam, performance.now()).landmarks[0];
+    if (L){
+      const d = (a, b) => Math.hypot(L[a].x - L[b].x, L[a].y - L[b].y);
+      const pinch = d(4, 8) / (d(0, 9) || .1);
+      const ext = [8, 12, 16, 20].filter(i => d(i, 0) > d(i - 2, 0) * 1.15).length;
+      if (pinch < .4){ gRotT = (1 - L[0].x) * 7; gT = Math.min(1.8, Math.max(.5, 2 - L[0].y * 2)); }   // pinch: rotate + resize
+      else gT = 1;
+      openF = ext === 4 && pinch > .6 ? openF + 1 : 0;
+      fistF = ext === 0 && pinch > .5 ? fistF + 1 : 0;
+      if (Date.now() > cool && openF > 25){ cool = Date.now() + 4000; openF = 0; awake = true; if (!listening) $("mic").click(); speak("Yes, Sir?"); }
+      if (Date.now() > cool && fistF > 20){ cool = Date.now() + 3000; fistF = 0; speechSynthesis.cancel(); awake = false; setMode(listening ? "listening" : "idle"); }
+    } else { openF = fistF = 0; gT = 1; }
+  }
+  requestAnimationFrame(handLoop);
+}
+async function initFace(){
+  await new Promise((ok, no) => { const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"; s.onload = ok; s.onerror = no; document.head.append(s); }).catch(() => {});
+  if (!window.faceapi) return log("Face model could not load (check internet).");
+  const U = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/";
+  await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(U), faceapi.nets.faceLandmark68Net.loadFromUri(U), faceapi.nets.faceRecognitionNet.loadFromUri(U)]);
+  faceReady = true; setInterval(faceTick, 1500);
+}
+const getFace = () => faceapi.detectSingleFace(cam, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceRecognitionNet();
+async function enroll(){
+  if (!faceReady) return reply("Turn the camera on first, Sir.");
+  const r = await getFace(); if (!r) return reply("I cannot see your face, Sir.");
+  localStorage.ultronFace = JSON.stringify([...r.descriptor]); reply("Your face is saved, Sir.");
+}
+let greeted = false, lastUnk = 0;
+async function faceTick(){
+  if (!localStorage.ultronFace) return;
+  const r = await getFace(); if (!r) return;
+  const dist = faceapi.euclideanDistance(r.descriptor, new Float32Array(JSON.parse(localStorage.ultronFace)));
+  if (dist < .5){ if (!greeted){ greeted = true; mood = "happy"; setTimeout(() => mood = "calm", 6000); reply("Welcome back, Sir."); } }
+  else if (Date.now() - lastUnk > 20000){ lastUnk = Date.now(); alertUntil = Date.now() + 4000; reply("Unknown face detected."); }
+}
+// --- Ultron speaks on his own ---
+let briefed = false;
+addEventListener("pointerdown", () => {
+  if (briefed) return; briefed = true;
+  const h = new Date().getHours(), day = new Date().toDateString();
+  if (h >= 5 && h < 12 && localStorage.brief !== day){
+    localStorage.brief = day; mood = "happy"; setTimeout(() => mood = "calm", 8000);
+    setTimeout(() => reply(`Good morning Sir. It is ${new Date().toLocaleTimeString("en-IN")}. ${lastWeather ? "Weather is " + lastWeather + "." : ""} Let us have a great day.`), 600);
+  }
+});
+setInterval(() => { mood = "think"; setTimeout(() => mood = "calm", 8000); reply("Sir, 2 ghante se kaam kar rahe ho. Thoda break lo."); }, 2 * 60 * 60 * 1000);
+
+// ===== BRAIN: people, custom welcomes, notes =====
+const brain = JSON.parse(localStorage.ultronBrain || '{"people":{},"notes":[]}');
+const saveBrain = () => localStorage.ultronBrain = JSON.stringify(brain);
+// preset people (a welcome taught by voice later will override these)
+if (!brain.people.irfan){
+  brain.people.irfan = {rel: "dost", greet: "Irfan bihari bhai teri setting ki sadhi hui hai, sunke khushi mili. Tu to gendu hai gendu chawal. Saniya ke haal kaise hain, Menika jaan kaisi hain aur meri babu Apshana kaisi hain"};
+  saveBrain();
+}
+if (!brain.people.anisyadav)
+{brain.people.anishyadav = {rel: "dost" , greet: "anishyadav loude gand mara kahi jake, chutiye bosdo tujse bada chutiya aaj tak nhi dekha lund"};
+nasim = Object.assign({rel: "dost", greet: "nasim bhai saniya ki yaad ara h uski chut dilwade mere boos anshhh ko yrr behen k lund our wo menika ka k chuche mast h mere ser n dabaye the bata rahe the wo our baat teri ma ki chut yr soyabin ki hi dilwade mereko our sun mere ser ko papa bola kar papa baap hain wo tera okk behen k lund"}, brain.people.nasim || {}); saveBrain();
+const cap = s => s.replace(/\b\p{L}/gu, c => c.toUpperCase());
+const clean = s => s.replace(/[^\p{L}\p{N} ]/gu, "").trim();
+function brainCtx(){
+  const p = Object.entries(brain.people).map(([n, v]) => cap(n) + (v.rel ? " (" + v.rel + ")" : "")).join(", ");
+  return (p ? "\nPeople you know: " + p + "." : "") + (brain.notes.length ? "\nThings Sir asked you to remember: " + brain.notes.join("; ") + "." : "");
+}
+function greetLine(n){
+  const v = brain.people[n], N = cap(n), r = v.rel || "";
+  if (v.greet) return v.greet;
+  if (/dost|friend|yaar/.test(r)) return `Aao ${N} bhai ! Kya haal hai?`;
+  if (/teacher|sir|madam|professor|guru/.test(r)) return `Namaste ${N}. Aapka swagat hai, ye mere liye samman ki baat hai ki mere liye yhe sochna ki na aap hi mere boss hu jisne mujkop banya is maddad k liye apka bht shukriya hain koi aap mere boss hu  .`;
+  if (/papa|mummy|mom|dad|father|mother|family|bhai|behen|sister|brother/.test(r)) return `Pranam ${N} ji! Aapka ghar mein swagat hai.`;
+  return `Welcome ${N}, nice to meet you.`;
+}
+const lastG = {};
+function greet(n){
+  if (Date.now() - (lastG[n] || 0) < 30000) return;
+  lastG[n] = Date.now(); mood = "happy"; setTimeout(() => mood = "calm", 7000);
+  reply(greetLine(n));
+}
+const person = (n, rel) => (brain.people[n] = Object.assign(brain.people[n] || {}, rel ? {rel} : {}), saveBrain());
+function brainCmd(q){
+  let m;
+  if ((m = q.match(/^(?:yaad rakho(?: ki)?|remember)\s+(.+?)\s+(?:mera|meri|mere|my|is my)\s+(\w+)(?:\s+(?:hai|hain|is))?$/))){
+    const n = clean(m[1]); if (n){ person(n, m[2]); reply(`Done Sir. ${cap(n)} is your ${m[2]}.`); return true; }
+  }
+  if ((m = q.match(/^(.+?)\s+ko\s+(?:aise\s+|is tarah\s+)?welcome\s+(?:karna|karo)[:,]?\s+(.+)$/)) || (m = q.match(/^greet\s+(.+?)\s+(?:with|by saying)\s+(.+)$/))){
+    const n = clean(m[1]); person(n); brain.people[n].greet = m[2]; saveBrain();
+    reply(`Samajh gaya Sir. Jab ${cap(n)} aayenge, main bolunga: ${m[2]}`); return true;
+  }
+  if ((m = q.match(/^(?:yaad rakho(?: ki)?|remember(?: that)?)\s+(.+)$/))){ brain.notes.push(m[1]); saveBrain(); reply("Noted, Sir. I will remember that."); return true; }
+  if ((m = q.match(/^(?:bhool jao|forget)\s+(.+)$/))){
+    const n = clean(m[1]);
+    if (brain.people[n]){ delete brain.people[n]; saveBrain(); reply(`${cap(n)} is erased from my memory.`); }
+    else { brain.notes = brain.notes.filter(x => !x.includes(m[1])); saveBrain(); reply("Forgotten, Sir."); }
+    return true;
+  }
+  if (/kya yaad hai|what do you remember|mera dimag|brain/.test(q)){
+    const p = Object.entries(brain.people).map(([n, v]) => cap(n) + (v.rel ? " (" + v.rel + ")" : "") + (v.greet ? ' - "' + v.greet + '"' : ""));
+    log("People: " + (p.join(" | ") || "none") + "\nNotes: " + (brain.notes.join(" | ") || "none"));
+    speak(`I know ${p.length} people and ${brain.notes.length} notes, Sir.`); return true;
+  }
+  // a known name in a short, non-question sentence = that person has arrived
+  if (q.split(/\s+/).length <= 5 && !/\?|kya|what|kaun|who|how|kaise/.test(q)){
+    for (const n of Object.keys(brain.people)) if (new RegExp("(^|\\s)" + n + "(\\s|$)").test(q)){ greet(n); return true; }
+  }
+  return false;
+}
+
+// ===== VOICE CHOICE =====
+let voices = [], vs = JSON.parse(localStorage.ultronVoice || '{"name":"","pitch":1,"rate":1}');
+const saveV = () => localStorage.ultronVoice = JSON.stringify(vs);
+function loadVoices(){
+  voices = speechSynthesis.getVoices();
+  $("vsel").innerHTML = '<option value="">Auto voice</option>' + voices.map(v => `<option value="${v.name}">${v.name} (${v.lang})</option>`).join("");
+  $("vsel").value = vs.name;
+}
+speechSynthesis.onvoiceschanged = loadVoices; loadVoices();
+$("vsel").onchange = e => { vs.name = e.target.value; saveV(); speak("Main Ultron hoon, Sir."); };
+function applyVoice(u){
+  const v = voices.find(x => x.name === vs.name);
+  if (v){ u.voice = v; u.lang = v.lang; }
+  u.pitch = vs.pitch; u.rate = vs.rate;
+}
+function voiceCmd(q){
+  const done = () => { saveV(); $("vsel").value = vs.name; speak("Main Ultron hoon, Sir. Kaisi lagi meri awaaz?"); return true; };
+  if (/(awaaz|aawaz|voice).*(badlo|badal|change|next|doosri)|voice change/.test(q)){
+    if (!voices.length) return reply("No voices found in this browser, Sir."), true;
+    const i = voices.findIndex(x => x.name === vs.name); vs.name = voices[(i + 1) % voices.length].name; return done();
+  }
+  if (/bhari|deep|heavy|gehri/.test(q) && /(awaaz|aawaz|voice)/.test(q)){ vs.pitch = .6; vs.rate = .9; return done(); }
+  if (/patli|thin|high|cartoon|chipmunk/.test(q) && /(awaaz|aawaz|voice)/.test(q)){ vs.pitch = 1.7; vs.rate = 1.1; return done(); }
+  if (/(tez|fast)/.test(q) && /(bolo|speak|awaaz|voice)/.test(q)){ vs.rate = Math.min(2, vs.rate + .2); return done(); }
+  if (/(dheere|slow)/.test(q) && /(bolo|speak|awaaz|voice)/.test(q)){ vs.rate = Math.max(.5, vs.rate - .2); return done(); }
+  if (/(normal|reset).*(awaaz|aawaz|voice)|(awaaz|aawaz|voice).*(normal|reset)/.test(q)){ vs = {name: "", pitch: 1, rate: 1}; return done(); }
+  return false;
+}
+
+log("Ultron online. Hello Sir.");
+</script>
+</body>
+</html>
